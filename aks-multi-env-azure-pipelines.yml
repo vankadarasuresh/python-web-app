@@ -37,7 +37,7 @@ stages:
     - task: PublishPipelineArtifact@1
       inputs:
         targetPath: '$(Pipeline.Workspace)'
-        artifact: 'manifests'
+        artifact: 'kube-manifests'
         publishLocation: 'pipeline'
 
 - stage: Dev
@@ -55,8 +55,8 @@ stages:
          - task: DownloadPipelineArtifact@2
            inputs:
              buildType: 'current'
-             artifactName: 'manifests'
-             targetPath: '$(Pipeline.Workspace)/manifests'
+             artifactName: 'kube-manifests'
+             targetPath: '$(Pipeline.Workspace)/kube-manifests'
          - task: KubernetesManifest@1
            inputs:
             action: 'deploy'
@@ -64,8 +64,8 @@ stages:
             kubernetesServiceConnection: 'Dev-my-aks-cluster-development-1700389999121'
             namespace: 'aksazure'
             manifests: |
-              $(Pipeline.Workspace)/manifests/deployment.yml                 
-              $(Pipeline.Workspace)/manifests/service.yml
+              $(Pipeline.Workspace)/kube-manifests/deployment.yml                 
+              $(Pipeline.Workspace)/kube-manifests/service.yml
             containers: 'svankad/azurepython:$(tag)'
              
 - stage: Staging
