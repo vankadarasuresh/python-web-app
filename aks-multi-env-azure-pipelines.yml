@@ -1,0 +1,93 @@
+trigger: none
+
+variables: 
+  tag: '$(Build.BuildId)'
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+#- stage: Tests
+#  jobs:
+#  - job: 
+#    displayName: Unit tests
+#    steps:
+#    - script: echo simulate running your unit tests!
+#      displayName: 'Run unit tests'
+#  - job: 
+#    displayName: UI tests
+#    steps:
+#    - script:  echo simulate running your ui tests!
+#      displayName: 'Run unit tests'
+
+- stage: Build
+  dependsOn: [] # This will remove implicit dependency and run in parallel with the stage: Tests above 
+  jobs:
+  - job:
+    displayName: Build the application
+    steps:
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'dockerhub'
+        repository: 'svankad/azurepython'
+        command: buildAndPush
+        Dockerfile: '**/Dockerfile'
+        tags: |
+          $(tag)
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: '$(Pipeline.Workspace)'
+        artifact: 'manifests'
+        publishLocation: 'pipeline'
+
+- stage: Dev
+  dependsOn:
+#  - Tests
+  - Build
+  jobs:
+  - deployment: Deploy
+    displayName: Dev aks deploy
+    environment: Dev
+    strategy:
+     runOnce:
+       deploy:
+         steps:
+         - task: DownloadPipelineArtifact@2
+           inputs:
+             buildType: 'current'
+             artifactName: 'manifests'
+             targetPath: '$(Pipeline.Workspace)/manifests'
+         - task: KubernetesManifest@1
+           inputs:
+            action: 'deploy'
+            connectionType: 'kubernetesServiceConnection'
+            kubernetesServiceConnection: 'Dev-my-aks-cluster-development-1700389999121'
+            namespace: 'aksazure'
+            manifests: |
+              $(Pipeline.Workspace)/manifests/deployment.yml                 
+              $(Pipeline.Workspace)/manifests/service.yml
+            containers: 'svankad/azurepython:$(tag)'
+             
+- stage: Staging
+  jobs:
+  - deployment:
+    displayName: Staging deploy
+    environment: Staging
+    strategy:
+     runOnce:
+       deploy:
+         steps:
+           - script: echo Running in the Staging environment as deployment job
+             displayName: 'Staging based stage'
+
+- stage: Production
+  jobs:
+  - deployment: 
+    displayName: Production deploy
+    environment: Production
+    strategy:
+     runOnce:
+       deploy:
+         steps:
+           - script: echo Running in the Production environment as deployment job
+             displayName: 'Production based stage'
